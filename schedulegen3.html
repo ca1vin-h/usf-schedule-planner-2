@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch Courses</title>
+</head>
+
+<body>
+    <label for="semester">Semester:</label>
+    <input type="text" id="semester" placeholder="Enter semester"><br><br>
+
+    <label for="subject">Subject:</label>
+    <input type="text" id="subject" placeholder="Enter subject"><br><br>
+
+    <label for="courseNumber">Course Number:</label>
+    <input type="text" id="courseNumber" placeholder="Enter course number"><br><br>
+
+    <button id="fetchCoursesBtn">Fetch Courses</button>
+    <button id="printCoursesBtn">Print Courses</button>
+    <button id="clearCoursesBtn">Clear Courses</button>
+
+    <div id="courseInfoContainer"></div> <!-- Container to display course information -->
+
+    <div id="schedulelist"></div> <!-- Paragraph to display the JSON output -->
+
+    <script>
+        // Define the global array variable
+        var courses = [];
+        var uniqueCourseIds = new Set();
+
+        //ADD BREAKS
+        let days = {
+                            "M": [],
+                            "T": ["02:00am-11:15pm"],
+                            "W": ["02:00am-11:15am"],
+                            "R": ["02:00am-11:15pm"],
+                            "F": [],
+                            "S": []
+                        }
+        //courses.push(generateSchedulePlusOneSection(days));
+        days = {
+                            "M": ["02:00am-10:00am"],
+                            "T": [],
+                            "W": [],
+                            "R": [],
+                            "F": [],
+                            "S": []
+                        }
+        //courses.push(generateSchedulePlusOneSection(days));
+
+
+        function generateSchedulePlusOneSection(days) {
+            return {
+                "semester": "202408",
+                "subject": "BREAK",
+                "number": "BREAK",
+                "sections": [
+                    {
+                        "DAYS": days,
+                        'CAMPUS': 'Tampa',
+                    }
+                ]
+            };
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+        // Check if there are collisions between sections
+        function sectionsCollide(sections) {
+            //let timeTable = { 'M': [["02:00am-11:15pm"]], 'T': [["08:00am-12:00pm"]], 'W': [], 'R': [], 'F': [], 'S': [] };
+            let timeTable = { 'M': [], 'T': [], 'W': [], 'R': [], 'F': [], 'S': [] };
+
+            for (let section of sections) {
+                if (section['DAYS'] === 'ONLINE') {
+                    continue;
+                }
+                for (let key in timeTable) {
+                    if (section['DAYS'][key].length !== 0) {
+                        timeTable[key].push(section['DAYS'][key]);
+                    }
+                }
+            }
+            console.log(timeTable);
+
+            for (let key in timeTable) {
+                if (timeTable[key].length <= 1) {
+                    continue;
+                }
+                for (let i = 0; i < timeTable[key].length; i++) {
+                    for (let j = 0; j < timeTable[key].length; j++) {
+                        if (i !== j && timeCollides(timeTable[key][i][0], timeTable[key][j][0])) {
+                            
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // Check if there is a time collision between two time slots in format 02:00pm-03:15pm
+        function timeCollides(time1, time2) {
+            const splitTime1 = time1.split('-');
+            const splitTime2 = time2.split('-');
+
+            const start1 = convertToMilitaryTime(splitTime1[0]);
+            const end1 = convertToMilitaryTime(splitTime1[1]);
+            const start2 = convertToMilitaryTime(splitTime2[0]);
+            const end2 = convertToMilitaryTime(splitTime2[1]);
+
+            if (end2 <= start1 || end1 <= start2) {
+                return false;
+            }
+            return true;
+        }
+
+        function convertToMilitaryTime(timeStr) {
+            const [time, period] = timeStr.split(/(?=[ap]m)/i);
+            const [hour, minute] = time.split(':').map(parseFloat);
+            let militaryHour = hour;
+            if (period.toLowerCase() === 'pm' && hour !== 12) {
+                militaryHour += 12;
+            } else if (period.toLowerCase() === 'am' && hour === 12) {
+                militaryHour = 0;
+            }
+            const militaryTime = militaryHour * 100 + minute;
+            return militaryTime;
+        }
+
+
+
+        // Generate schedules for given courses
+        function generateSchedules(courses) {
+            let numSchedules = 0;
+            let maxSchedules = 5;
+
+            for (let course of courses) {
+                maxSchedules *= course.sections.length;
+            }
+
+            let schedules = [];
+            let tempSchedule = new Array(courses.length).fill(null);
+
+            function generate(scheduleIndex) {
+                if (scheduleIndex === courses.length) {
+                    schedules.push([...tempSchedule]);
+                    numSchedules++;
+                    return;
+                }
+
+                for (let section of courses[scheduleIndex].sections) {
+                    if (section.DAYS === 'ONLINE') {
+                        continue
+                    }
+
+                    if (section.CAMPUS !== 'Tampa') {
+                        continue;
+                    }
+
+                    //ADD ADDITIONAL LOGIC FOR FILTERING SECTIONS HERE ////////////////////////////////////////
+
+                    tempSchedule[scheduleIndex] = section;
+                    let collision = false;
+
+                    for (let i = 0; i < scheduleIndex; i++) {
+                        if (sectionsCollide([tempSchedule[i], section])) {
+                            collision = true;
+                            break;
+                        }
+                    }
+                    if (!collision && numSchedules < 25) {
+                        generate(scheduleIndex + 1);
+                    }
+                }
+            }
+
+            generate(0);
+            if (schedules.length === 0) {
+                console.log("Courses collided, no schedules generated");
+            }
+
+            schedules.forEach((innerArray, index) => {
+                console.log(`List ${index + 1}:`);
+
+                // Iterate through each object within the inner array
+                innerArray.forEach(obj => {
+                    console.log(`subj_course: ${obj.SUBJ_CRS}, course_title: ${obj.TITLE}, crn: ${obj.CRN}`);
+                });
+
+                // Add a break between each top list
+                console.log("\n");
+            });
+
+
+
+
+            return schedules;
+        }
+
+
+
+
+
+        // Function to fetch data from the API and add it to the courses array
+        function fetchDataAndAddToCourses() {
+            // Get values from text boxes
+            var semester = document.getElementById('semester').value;
+            var subject = document.getElementById('subject').value;
+            var courseNumber = document.getElementById('courseNumber').value;
+
+            // Make a fetch request to the API
+            fetch(`http://3.15.203.88/get-course?P_SEMESTER=${semester}&P_SUBJ=${subject}&P_NUM=${courseNumber}`)
+                .then(response => {
+                    // Check if the response status is 400
+                    if (response.status === 400) {
+                        throw new Error('Invalid course');
+                    }
+                    // Parse the JSON response
+                    return response.json();
+                })
+                .then(data => {
+                    // Check if the course already exists in the set
+                    if (!uniqueCourseIds.has(data.semester + data.subject + data.number)) {
+                        // Add the course ID to the set
+                        uniqueCourseIds.add(data.semester + data.subject + data.number);
+                        // Add the response data to the courses array
+                        courses.push(data);
+                        console.log('Courses:', courses); // Log courses array to console
+                        // Display course information
+                        displayCourseInfo(data);
+                    }
+                    else {
+                        console.log('Course already fetched:', data);
+                    }
+                })
+                .catch(error => {
+                    // Display error message in a popup
+                    alert(error.message);
+                    console.error('Error fetching data:', error);
+                });
+        }
+
+        // Function to display course information
+        function displayCourseInfo(course) {
+            var courseInfoContainer = document.getElementById('courseInfoContainer');
+            // Construct HTML to display course information
+            var html = `
+    <div class="courseInfo" id="${course.semester}${course.subject}${course.number}">
+      <h3>Course Information</h3>
+      <p>Semester: ${course.semester}</p>
+      <p>Subject: ${course.subject}</p>
+      <p>Number: ${course.number}</p>
+      <p>Sections: ${course.sections.length}</p>
+      <button class="removeCourseBtn" data-id="${course.semester}${course.subject}${course.number}">Remove</button>
+    </div>
+  `;
+            // Append the HTML content to the container
+            courseInfoContainer.innerHTML += html;
+
+            // Add event listener to remove button
+            var removeCourseBtns = document.querySelectorAll('.removeCourseBtn');
+            removeCourseBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    var courseId = this.getAttribute('data-id');
+                    removeCourse(courseId);
+                });
+            });
+        }
+
+        // Function to remove a course
+        function removeCourse(courseId) {
+            // Find index of the course in the courses array
+            var index = courses.findIndex(course => course.semester + course.subject + course.number === courseId);
+            if (index !== -1) {
+                // Remove course from courses array
+                courses.splice(index, 1);
+                // Remove course from display
+                var courseElement = document.getElementById(courseId);
+                courseElement.remove();
+                // Remove course from uniqueCourseIds set
+                uniqueCourseIds.delete(courseId);
+            }
+        }
+
+
+        // Function to print the entire JSON array
+
+
+        // Function to clear courses array and course information
+        function clearCourses() {
+            // Reset courses array and course information container
+            courses = [];
+            uniqueCourseIds.clear();
+            document.getElementById('courseInfoContainer').innerHTML = '';
+            document.getElementById('schedulelist').textContent = '';
+        }
+
+
+
+        function displayTables(data) {
+            let output = '';
+            data.forEach((courseData, index) => {
+                output += `<h2>Table ${index + 1}</h2>`;
+                output += `<table border="1" cellpadding="5" cellspacing="0">`;
+                output += `<tr><th>CRN</th><th>CAMPUS</th><th>SUBJECT_COURSE</th><th>CAMPUS</th><th>Title</th><th>Instructor</th><th>DAYS</th><th>Monday</th><th>Tuesday</th><th>Wednesday</th><th>Thursday</th><th>Friday</th><th>Saturday</th></tr>`;
+                courseData.forEach(course => {
+                    output += `<tr><td>${course.CRN}</td><td>${course.CAMPUS}</td><td>${course.SUBJ_CRS}</td><td>${course.CAMPUS}</td><td>${course.TITLE}</td><td>${course.INSTRUCTOR}</td><td>${course.DAYS}</td><td>${course.DAYS.M}</td><td>${course.DAYS.T}</td><td>${course.DAYS.W}</td><td>${course.DAYS.R}</td><td>${course.DAYS.F}</td><td>${course.DAYS.S}</td></tr>`;
+                });
+                output += `</table>`;
+            });
+            document.getElementById('schedulelist').innerHTML = output;
+        }
+
+        // Get the button elements
+        var fetchCoursesBtn = document.getElementById('fetchCoursesBtn');
+        var printCoursesBtn = document.getElementById('printCoursesBtn');
+        var clearCoursesBtn = document.getElementById('clearCoursesBtn');
+
+        // Add click event listeners to the buttons
+        fetchCoursesBtn.addEventListener('click', function () {
+            // Call the function to fetch data and add it to the courses array
+            fetchDataAndAddToCourses();
+        });
+
+        printCoursesBtn.addEventListener('click', function () {
+            // Call the function to print the entire JSON array
+            displayTables(generateSchedules(courses));
+        });
+
+        clearCoursesBtn.addEventListener('click', function () {
+            // Call the function to clear courses array and course information
+            clearCourses();
+        });
+    </script>
+</body>
+
+</html>
